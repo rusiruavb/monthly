@@ -1,0 +1,18 @@
+@media print {
+  aside,
+  .no-print {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+
+  .loan-print-area {
+    width: 100%;
+  }
+
+  table {
+    font-size: 12px;
+  }
+}

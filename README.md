@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CFIMA — Personal Finance Management
 
-## Getting Started
+Track income & expenses, manage loans, and view monthly summaries — synced with **Google Sheets** and **Google Drive**.
 
-First, run the development server:
+## Stack
+
+- React 19 + Vite + TypeScript (strict)
+- Tailwind CSS + shadcn/ui
+- React Router, TanStack Query, React Hook Form + Zod
+- Express API proxy for Google Sheets/Drive (service account)
+
+## Setup
+
+1. Install dependencies:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Copy environment variables:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cp .env.example .env
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+3. Configure Google Cloud:
 
-## Learn More
+- Create a service account with Sheets & Drive API access
+- Share your spreadsheet with the service account email (Editor)
+- Set credentials path, `GOOGLE_SPREADSHEET_ID`, and `GOOGLE_DRIVE_FOLDER_ID` in `.env` (see `.env.example`)
 
-To learn more about Next.js, take a look at the following resources:
+**Drive attachments (required for file upload):** Service accounts cannot use storage in a personal **My Drive** folder. Pick one:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Shared drive (recommended):** In Google Workspace, create a [Shared drive](https://developers.google.com/workspace/drive/api/guides/about-shareddrives), add the service account as **Content manager**, create an attachments folder inside it, and set `GOOGLE_DRIVE_FOLDER_ID` to that folder’s ID (from the folder URL).
+- **Impersonation (Workspace):** Enable [domain-wide delegation](https://developers.google.com/identity/protocols/oauth2/service-account#delegatingauthority) for the service account, grant Drive scope in Admin Console, set `GOOGLE_DRIVE_IMPERSONATE_USER` to your workspace email, and use a folder ID from that user’s Drive.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+4. Run development (Vite + API server):
 
-## Deploy on Vercel
+```bash
+pnpm dev
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Open [http://localhost:5173](http://localhost:5173).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Routes
+
+| Path | Description |
+|------|-------------|
+| `/income-expense` | Income & expense tracking (default) |
+| `/loans` | Loan card grid |
+| `/loans/:loanId` | Loan payment breakdown |
+| `/summary` | Monthly charts & summary |
+
+## Sheet structure
+
+- **Income_Expense** tab: `date`, `amount`, `description`, `finance type`, `google drive link`
+- **One tab per loan** with metadata rows + payment schedule

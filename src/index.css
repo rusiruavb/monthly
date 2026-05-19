@@ -1,0 +1,104 @@
+@import "react-day-picker/style.css";
+
+/* Align react-day-picker defaults with our compact calendar (--cell-size on .rdp-root) */
+.rdp-root {
+  --rdp-accent-color: #10463b;
+  --rdp-accent-background-color: #f5f0d1;
+  --rdp-today-color: #10463b;
+  --rdp-day-height: var(--cell-size, 2rem);
+  --rdp-day-width: var(--cell-size, 2rem);
+  --rdp-day_button-height: var(--cell-size, 2rem);
+  --rdp-day_button-width: var(--cell-size, 2rem);
+  --rdp-nav_button-height: 1.75rem;
+  --rdp-nav_button-width: 1.75rem;
+  --rdp-nav-height: 1.75rem;
+  --rdp-weekday-padding: 0;
+  --rdp-months-gap: 0;
+}
+
+.rdp-root .rdp-day_button {
+  border: none;
+}
+
+.rdp-root .rdp-selected .rdp-day_button {
+  border: none;
+}
+
+/* Popover shadow (global rule disables Tailwind shadows) */
+.calendar-popover {
+  box-shadow:
+    0 4px 6px -1px rgb(16 70 59 / 0.08),
+    0 2px 4px -2px rgb(16 70 59 / 0.06) !important;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+    --primary-foreground: 48 33% 89%;
+    --secondary-foreground: 168 63% 17%;
+    --muted: 48 33% 94%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 48 33% 89%;
+    --accent-foreground: 168 63% 17%;
+    --destructive: 358 48% 59%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 168 20% 85%;
+    --input: 168 20% 85%;
+    --ring: 168 63% 17%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+
+  button,
+  input,
+  select,
+  textarea,
+  [role="combobox"] {
+    border-radius: 8px !important;
+  }
+
+  .shadow,
+  .shadow-sm,
+  .shadow-md,
+  .shadow-lg,
+  .shadow-xl,
+  .shadow-2xl {
+    box-shadow: none !important;
+  }
+}
+
+@layer utilities {
+  .font-mono-numeric {
+    font-family: "Geist Mono", monospace;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  body {
+    background: white;
+  }
+}
