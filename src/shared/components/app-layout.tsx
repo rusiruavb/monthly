@@ -1,10 +1,13 @@
 import {
+  Download,
   LayoutDashboard,
   Receipt,
   Landmark,
   TrendingUp,
 } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { downloadExport } from "@/shared/lib/api";
 import { cn } from "@/shared/lib/utils";
 
 const navItems = [
@@ -63,24 +66,43 @@ function NavItem({
 export function AppLayout() {
   return (
     <div className="flex min-h-screen flex-col bg-background lg:flex-row">
-      {/* Desktop sidebar (wide screens only) */}
       <aside className="no-print hidden w-64 shrink-0 flex-col border-r border-primary/20 bg-secondary lg:flex">
-        <div className="flex items-center gap-2 border-b border-primary/20 px-6 py-5">
-          <LayoutDashboard className="h-6 w-6 text-primary" />
-          <span className="text-lg font-semibold text-primary">CFIMA</span>
+        <div className="flex items-center justify-between gap-2 border-b border-primary/20 px-6 py-5">
+          <div className="flex items-center gap-2">
+            <LayoutDashboard className="h-6 w-6 text-primary" />
+            <span className="text-lg font-semibold text-primary">CFIMA</span>
+          </div>
         </div>
         <nav className="flex flex-1 flex-col gap-1 p-4">
           {navItems.map(({ to, label, icon }) => (
             <NavItem key={to} to={to} label={label} icon={icon} />
           ))}
         </nav>
+        <div className="border-t border-primary/20 p-4">
+          <Button
+            variant="outline"
+            className="w-full gap-2 border-primary/30 text-primary"
+            onClick={() => downloadExport()}
+          >
+            <Download className="h-4 w-4" />
+            Download data
+          </Button>
+        </div>
       </aside>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {/* Mobile header */}
         <header className="no-print sticky top-0 z-30 flex items-center gap-2 border-b border-primary/20 bg-secondary px-4 py-3 lg:hidden">
           <LayoutDashboard className="h-6 w-6 shrink-0 text-primary" />
-          <span className="text-lg font-semibold text-primary">CFIMA</span>
+          <span className="flex-1 text-lg font-semibold text-primary">CFIMA</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0 text-primary"
+            onClick={() => downloadExport()}
+            aria-label="Download data"
+          >
+            <Download className="h-4 w-4" />
+          </Button>
         </header>
 
         <main className="min-w-0 flex-1 overflow-auto p-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:p-5 lg:p-6 lg:pb-8 xl:p-8">
@@ -88,7 +110,6 @@ export function AppLayout() {
         </main>
       </div>
 
-      {/* Mobile bottom navigation */}
       <nav
         className="no-print fixed inset-x-0 bottom-0 z-40 flex border-t border-primary/20 bg-secondary px-2 pb-[env(safe-area-inset-bottom)] pt-1 lg:hidden"
         aria-label="Main navigation"

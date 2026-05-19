@@ -63,7 +63,7 @@ export function LoanFormDialog({ open, onOpenChange, loan }: LoanFormDialogProps
   const onSubmit = (values: LoanFormValues) => {
     if (isEdit && loan) {
       updateMutation.mutate(
-        { tabName: loan.id, values },
+        { loanId: loan.id, values },
         { onSuccess: () => onOpenChange(false) },
       );
     } else {

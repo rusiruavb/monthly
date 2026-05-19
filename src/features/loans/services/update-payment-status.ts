@@ -1,34 +1,17 @@
 import type { PaymentStatus } from "@/features/loans/types/loan";
-import {
-  formatAttachedFile,
-  readSheet,
-  updateRow,
-  uploadFile,
-} from "@/shared/lib/google-api";
+import { togglePaymentStatus, uploadPaymentFile } from "@/shared/lib/api";
 
-export async function togglePaymentStatus(
-  tabName: string,
-  rowIndex: number,
-  currentStatus: PaymentStatus,
+export async function togglePaymentStatusForLoan(
+  loanId: string,
+  paymentId: number,
 ): Promise<PaymentStatus> {
-  const rows = await readSheet(tabName);
-  const row = rows[rowIndex - 1];
-  if (!row) throw new Error("Payment row not found");
-  const newStatus: PaymentStatus = currentStatus === "paid" ? "pending" : "paid";
-  row[6] = newStatus;
-  await updateRow(tabName, rowIndex, row);
-  return newStatus;
+  return togglePaymentStatus(loanId, paymentId);
 }
 
-export async function uploadPaymentFile(
-  tabName: string,
-  rowIndex: number,
+export async function uploadPaymentFileForLoan(
+  loanId: string,
+  paymentId: number,
   file: File,
 ): Promise<void> {
-  const uploaded = await uploadFile(file);
-  const rows = await readSheet(tabName);
-  const row = rows[rowIndex - 1];
-  if (!row) throw new Error("Payment row not found");
-  row[5] = formatAttachedFile(uploaded.name, uploaded.link);
-  await updateRow(tabName, rowIndex, row);
+  await uploadPaymentFile(loanId, paymentId, file);
 }

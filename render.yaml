@@ -1,0 +1,23 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Deploy: connect repo → Render reads this file → New Blueprint
+services:
+  - type: web
+    name: cfima
+    runtime: node
+    plan: starter
+    buildCommand: pnpm install && pnpm build
+    startCommand: pnpm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data
+      - key: DATABASE_PATH
+        value: /var/data/cfima.db
+      - key: CLIENT_URL
+        sync: false
+    disk:
+      name: cfima-data
+      mountPath: /var/data
+      sizeGB: 1

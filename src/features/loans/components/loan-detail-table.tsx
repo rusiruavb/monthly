@@ -30,10 +30,7 @@ export function LoanDetailTable({ loan }: LoanDetailTableProps) {
             <PaymentCard
               payment={payment}
               onToggle={() =>
-                toggleMutation.mutate({
-                  rowIndex: payment.rowIndex,
-                  currentStatus: payment.status,
-                })
+                toggleMutation.mutate({ rowIndex: payment.rowIndex })
               }
               onUpload={(file) =>
                 uploadMutation.mutate({ rowIndex: payment.rowIndex, file })
@@ -66,10 +63,7 @@ export function LoanDetailTable({ loan }: LoanDetailTableProps) {
                 key={payment.rowIndex}
                 payment={payment}
                 onToggle={() =>
-                  toggleMutation.mutate({
-                    rowIndex: payment.rowIndex,
-                    currentStatus: payment.status,
-                  })
+                  toggleMutation.mutate({ rowIndex: payment.rowIndex })
                 }
                 onUpload={(file) =>
                   uploadMutation.mutate({ rowIndex: payment.rowIndex, file })

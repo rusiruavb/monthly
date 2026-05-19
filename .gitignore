@@ -15,6 +15,9 @@ secrets/
 google-service-account.json
 *-service-account.json
 
+# database
+/data/
+
 # misc
 .DS_Store
 *.log
@@ -22,3 +25,4 @@ google-service-account.json
 # IDE
 .idea
 .vscode
+.pnpm-store

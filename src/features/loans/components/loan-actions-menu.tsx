@@ -32,7 +32,7 @@ import {
 import { LoanFormDialog } from "@/features/loans/components/loan-form-dialog";
 import { useDeleteLoan } from "@/features/loans/hooks/use-delete-loan";
 import type { Loan } from "@/features/loans/types/loan";
-import { getSpreadsheetUrl } from "@/shared/lib/google-api";
+import { downloadExport } from "@/shared/lib/api";
 import { formatCurrency } from "@/shared/lib/utils";
 
 interface LoanActionsMenuProps {
@@ -91,15 +91,9 @@ export function LoanActionsMenu({ loan }: LoanActionsMenuProps) {
     window.location.href = `mailto:?subject=${encodeURIComponent(`Loan summary: ${loan.name}`)}&body=${body}`;
   };
 
-  const shareLoan = async () => {
-    try {
-      const url =
-        import.meta.env.VITE_SPREADSHEET_URL ?? (await getSpreadsheetUrl());
-      await navigator.clipboard.writeText(url);
-      toast.success("Spreadsheet link copied");
-    } catch {
-      toast.error("Failed to copy link");
-    }
+  const exportAllData = () => {
+    downloadExport();
+    toast.success("Downloading all data…");
   };
 
   return (
@@ -126,8 +120,8 @@ export function LoanActionsMenu({ loan }: LoanActionsMenuProps) {
           <DropdownMenuItem onClick={emailLoan}>
             <Mail className="mr-2 h-4 w-4" /> Email
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => void shareLoan()}>
-            <Share2 className="mr-2 h-4 w-4" /> Share
+          <DropdownMenuItem onClick={exportAllData}>
+            <Share2 className="mr-2 h-4 w-4" /> Export all data
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem className="text-expense" onClick={() => setDeleteOpen(true)}>
@@ -143,7 +137,7 @@ export function LoanActionsMenu({ loan }: LoanActionsMenuProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete loan?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will delete the &quot;{loan.name}&quot; sheet tab permanently.
+              This will permanently delete &quot;{loan.name}&quot; and all its payments.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
