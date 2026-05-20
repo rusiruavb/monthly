@@ -1,13 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -16,40 +12,44 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  postToLedgerSchema,
-  type PostToLedgerFormValues,
-} from "@/features/budget/schemas/budget-schema";
+import { Input } from "@/components/ui/input";
 import type { BudgetLine } from "@/features/budget/types/budget";
 import { AmountInput } from "@/shared/components/amount-input";
 import { DatePickerField } from "@/shared/components/date-picker-field";
 
-interface PostToLedgerDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  line: BudgetLine | null;
-  onSubmit: (values: PostToLedgerFormValues) => void;
-  isPending?: boolean;
-}
+const editLedgerSchema = z.object({
+  description: z.string().min(1, "Description is required"),
+  date: z.date({ required_error: "Date is required" }),
+  amount: z.coerce.number().positive("Amount must be greater than 0"),
+});
 
-export function PostToLedgerDialog({
+type EditLedgerFormValues = z.infer<typeof editLedgerSchema>;
+
+export function EditLedgerEntryDialog({
   open,
   onOpenChange,
   line,
   onSubmit,
   isPending,
-}: PostToLedgerDialogProps) {
-  const form = useForm<PostToLedgerFormValues>({
-    resolver: zodResolver(postToLedgerSchema),
-    defaultValues: {
-      date: new Date(),
-      amount: 0,
-    },
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  line: BudgetLine | null;
+  onSubmit: (values: EditLedgerFormValues) => void;
+  isPending?: boolean;
+}) {
+  const form = useForm<EditLedgerFormValues>({
+    resolver: zodResolver(editLedgerSchema),
+    defaultValues: { description: "", date: new Date(), amount: 0 },
   });
 
   useEffect(() => {
     if (open && line) {
-      form.reset({ date: new Date(), amount: line.amount });
+      form.reset({
+        description: line.description,
+        date: new Date(),
+        amount: line.amount,
+      });
     }
   }, [open, line, form]);
 
@@ -59,14 +59,26 @@ export function PostToLedgerDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Post to ledger</DialogTitle>
+          <DialogTitle>Edit ledger entry</DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground">{line.description}</p>
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit((values) => onSubmit(values))}
             className="space-y-4"
           >
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="date"
@@ -98,7 +110,7 @@ export function PostToLedgerDialog({
                 Cancel
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending ? "Posting…" : "Post"}
+                {isPending ? "Saving…" : "Save"}
               </Button>
             </div>
           </form>
@@ -107,3 +119,4 @@ export function PostToLedgerDialog({
     </Dialog>
   );
 }
+

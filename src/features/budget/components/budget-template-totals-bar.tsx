@@ -1,13 +1,13 @@
 import { Card, CardContent } from "@/components/ui/card";
-import type { BudgetTotals } from "@/features/budget/types/budget";
+import type { TemplateTotals } from "@/features/budget/lib/template-totals";
 import { Numeric } from "@/shared/components/numeric";
 import { cn } from "@/shared/lib/utils";
 
-interface BudgetTotalsBarProps {
-  totals: BudgetTotals;
+interface BudgetTemplateTotalsBarProps {
+  totals: TemplateTotals;
 }
 
-export function BudgetTotalsBar({ totals }: BudgetTotalsBarProps) {
+export function BudgetTemplateTotalsBar({ totals }: BudgetTemplateTotalsBarProps) {
   const items = [
     { label: "Income", value: totals.incomeTotal, className: "text-income" },
     {

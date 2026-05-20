@@ -2,10 +2,10 @@ import {
   CalendarRange,
   Download,
   LayoutDashboard,
-  Receipt,
   Landmark,
   TrendingUp,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { downloadExport } from "@/shared/lib/api";
@@ -13,15 +13,9 @@ import { cn } from "@/shared/lib/utils";
 
 const navItems = [
   {
-    to: "/income-expense",
-    label: "Income & Expense",
-    shortLabel: "Ledger",
-    icon: Receipt,
-  },
-  {
-    to: "/budget",
-    label: "Monthly Budget",
-    shortLabel: "Budget",
+    to: "/monthly",
+    label: "Monthly",
+    shortLabel: "Monthly",
     icon: CalendarRange,
   },
   { to: "/loans", label: "Loans", shortLabel: "Loans", icon: Landmark },
@@ -36,7 +30,7 @@ function NavItem({
 }: {
   to: string;
   label: string;
-  icon: typeof Receipt;
+  icon: LucideIcon;
   compact?: boolean;
 }) {
   return (
@@ -82,7 +76,7 @@ export function AppLayout() {
         <div className="flex items-center justify-between gap-2 border-b border-primary/20 px-6 py-5">
           <div className="flex items-center gap-2">
             <LayoutDashboard className="h-6 w-6 text-primary" />
-            <span className="text-lg font-semibold text-primary">CFiMa</span>
+            <span className="text-lg font-semibold text-primary">Monthly</span>
           </div>
         </div>
         <nav className="flex flex-1 flex-col gap-1 p-4">
@@ -106,7 +100,7 @@ export function AppLayout() {
         <header className="no-print sticky top-0 z-30 flex items-center gap-2 border-b border-primary/20 bg-secondary px-4 py-3 lg:hidden">
           <LayoutDashboard className="h-6 w-6 shrink-0 text-primary" />
           <span className="flex-1 text-lg font-semibold text-primary">
-            CFiMa
+            Monthly
           </span>
           <Button
             variant="ghost"
@@ -120,7 +114,9 @@ export function AppLayout() {
         </header>
 
         <main className="min-w-0 flex-1 overflow-auto p-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:p-5 lg:p-6 lg:pb-8 xl:p-8">
-          <Outlet />
+          <div className="mx-auto w-full max-w-6xl">
+            <Outlet />
+          </div>
         </main>
       </div>
 

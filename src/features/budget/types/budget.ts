@@ -5,6 +5,8 @@ export type AmountSource = "template" | "previous_month";
 export type BudgetFrequency = "monthly" | "manual_only";
 export type BudgetLineStatus = "planned" | "paid" | "skipped";
 export type AmountMode = "template" | "previous_month";
+export type BudgetItemType = "regular" | "fixed_deposit";
+export type SavingsBucket = "savings" | "one_off";
 
 export type RecurringBudgetItem = {
   id: number;
@@ -12,6 +14,12 @@ export type RecurringBudgetItem = {
   amount: number;
   financeType: FinanceType;
   section: BudgetSection;
+  itemType?: BudgetItemType;
+  savingsBucket?: SavingsBucket;
+  featureCategory?: string | null;
+  fixedDepositDay?: number | null;
+  fixedDepositMaturityMonths?: number | null;
+  fixedDepositInterestRate?: number | null;
   sortOrder: number;
   isActive: boolean;
   amountSource: AmountSource;
@@ -33,6 +41,13 @@ export type BudgetLine = {
   amount: number;
   financeType: FinanceType;
   section: BudgetSection;
+  itemType?: BudgetItemType;
+  savingsBucket?: SavingsBucket;
+  featureCategory?: string | null;
+  plannedDate?: string | null;
+  fixedDepositDate?: string | null;
+  fixedDepositMaturityMonths?: number | null;
+  fixedDepositInterestRate?: number | null;
   sortOrder: number;
   status: BudgetLineStatus;
   transactionId: number | null;
@@ -44,6 +59,7 @@ export type BudgetTotals = {
   fixedTotal: number;
   variableTotal: number;
   expenseTotal: number;
+  fixedDepositTotal: number;
   savingsTotal: number;
   remaining: number;
 };

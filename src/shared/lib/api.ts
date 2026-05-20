@@ -27,6 +27,8 @@ export async function addTransaction(data: {
   amount: number;
   description: string;
   financeType: FinanceType;
+  category?: string;
+  loanPaymentId?: number | null;
   file?: File | null;
 }): Promise<void> {
   const formData = new FormData();
@@ -34,6 +36,8 @@ export async function addTransaction(data: {
   formData.append("amount", String(data.amount));
   formData.append("description", data.description);
   formData.append("financeType", data.financeType);
+  if (data.category) formData.append("category", data.category);
+  if (data.loanPaymentId != null) formData.append("loanPaymentId", String(data.loanPaymentId));
   if (data.file) formData.append("file", data.file);
   await request("/transactions", { method: "POST", body: formData });
 }
@@ -45,6 +49,8 @@ export async function updateTransaction(
     amount: number;
     description: string;
     financeType: FinanceType;
+    category?: string;
+    loanPaymentId?: number | null;
     file?: File | null;
     existingLink?: string;
   },
@@ -54,6 +60,8 @@ export async function updateTransaction(
   formData.append("amount", String(data.amount));
   formData.append("description", data.description);
   formData.append("financeType", data.financeType);
+  if (data.category) formData.append("category", data.category);
+  if (data.loanPaymentId != null) formData.append("loanPaymentId", String(data.loanPaymentId));
   if (!data.file && data.existingLink) {
     formData.append("keepAttachment", "true");
   }

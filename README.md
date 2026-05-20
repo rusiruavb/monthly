@@ -1,4 +1,4 @@
-# CFIMA — Personal Finance Management
+# Monthly — Personal Finance Management
 
 Track income & expenses, manage loans, and view monthly summaries — stored locally in **SQLite** on your device.
 
@@ -31,6 +31,40 @@ pnpm dev
 
 Open [http://localhost:5173](http://localhost:5173).
 
+## Desktop app (Electron, fully offline)
+
+Monthly can be packaged as a **fully offline** desktop app (macOS/Windows/Linux) using Electron. In production, Electron starts the local Express server on `127.0.0.1` and opens a window to it; SQLite + attachments are stored on-device under the OS user data directory.
+
+### Dev (desktop)
+
+```bash
+pnpm dev:desktop
+```
+
+This runs:
+- Vite dev server (`http://localhost:5173`)
+- Express API server (`http://localhost:3001`)
+- Electron pointed at the Vite dev server
+
+### Build (desktop)
+
+```bash
+pnpm build:desktop
+```
+
+Build outputs:
+- `dist/` (Vite UI)
+- `dist-server/` (compiled Express server)
+- `dist-electron/` (Electron main/preload)
+
+### Package installers
+
+```bash
+pnpm dist
+```
+
+Artifacts are written to `release/`.
+
 ## Data storage
 
 All data lives under `./data/` (configurable via `DATA_DIR` and `DATABASE_PATH`):
@@ -42,22 +76,36 @@ All data lives under `./data/` (configurable via `DATA_DIR` and `DATABASE_PATH`)
 
 No Google account or internet connection is required after install.
 
+### Desktop data location
+
+In the Electron desktop build, data is stored under Electron’s per-user app data directory:
+- **SQLite DB**: `<userData>/data/cfima.db`
+- **Attachments**: `<userData>/data/attachments/`
+
 ## Export / download
 
-Use **Download data** in the sidebar (or mobile header) to export everything as a JSON file (`cfima-export-YYYY-MM-DD.json`). Individual loans can also export CSV from the loan actions menu.
+Use **Download data** in the sidebar (or mobile header) to export everything as a JSON file (`monthly-export-YYYY-MM-DD.json`). Individual loans can also export CSV from the loan actions menu.
+
+## Desktop smoke test checklist
+
+- **Fresh install**: app launches; DB is created under `<userData>/data/cfima.db`
+- **CRUD**: create/edit/delete a transaction; create a loan; create a budget month
+- **Attachments**: upload a receipt/payment file; verify it’s readable via the UI
+- **Export**: use Download data (`/api/export`) and confirm JSON downloads
+- **Offline**: disable network and confirm the app still works (everything is local)
 
 ## Routes
 
 | Path | Description |
 |------|-------------|
-| `/income-expense` | Income & expense tracking (default) |
+| `/monthly` | Monthly planning (with Ledger tab) |
 | `/loans` | Loan card grid |
 | `/loans/:loanId` | Loan payment breakdown |
 | `/summary` | Monthly charts & summary |
 
 ## Deploy on Render
 
-CFIMA runs as **one Web Service**: Express serves the API and the built React app. SQLite and attachments live on a **persistent disk** so data survives redeploys.
+Monthly runs as **one Web Service**: Express serves the API and the built React app. SQLite and attachments live on a **persistent disk** so data survives redeploys.
 
 ### Requirements
 

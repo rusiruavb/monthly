@@ -1,15 +1,14 @@
-import { Check, MoreHorizontal, Plus, SkipForward, Trash2 } from "lucide-react";
+import { Check, MoreHorizontal, Pencil, Plus, SkipForward, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -19,21 +18,29 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AddBudgetLineDialog } from "@/features/budget/components/add-budget-line-dialog";
+import { AnnualBudgetTotalsBar } from "@/features/budget/components/annual-budget-totals-bar";
 import { BudgetTotalsBar } from "@/features/budget/components/budget-totals-bar";
 import { CreateMonthDialog } from "@/features/budget/components/create-month-dialog";
+import { EditLedgerEntryDialog } from "@/features/budget/components/edit-ledger-entry-dialog";
 import { PostToLedgerDialog } from "@/features/budget/components/post-to-ledger-dialog";
+import { YearMonthTabs } from "@/features/budget/components/year-month-tabs";
 import {
   useAddBudgetLine,
+  useAnnualBudgetTotals,
   useBudgetMonth,
   useCreateMonthFromTemplate,
   useDeleteBudgetLine,
   usePostBudgetLineToLedger,
+  useRemoveBudgetLineFromLedger,
+  useUpdatePostedBudgetLine,
   useUpdateBudgetLine,
 } from "@/features/budget/hooks/use-budget-month";
+import { compactCell, compactHead } from "@/features/budget/lib/compact-table";
 import { SECTION_LABELS, SECTION_ORDER } from "@/features/budget/lib/section-labels";
 import type { BudgetLineFormValues } from "@/features/budget/schemas/budget-schema";
-import type { BudgetLine, BudgetSection } from "@/features/budget/types/budget";
+import type { BudgetLine, BudgetLineStatus, BudgetSection } from "@/features/budget/types/budget";
 import { Numeric } from "@/shared/components/numeric";
+import { AmountInput } from "@/shared/components/amount-input";
 import { cn } from "@/shared/lib/utils";
 
 interface BudgetMonthViewProps {
@@ -41,18 +48,42 @@ interface BudgetMonthViewProps {
   onYearMonthChange: (yearMonth: string) => void;
 }
 
+function sectionMonthTotal(lines: BudgetLine[], section: BudgetSection): number {
+  return lines
+    .filter((line) => line.section === section && line.status !== "skipped")
+    .reduce((sum, line) => sum + line.amount, 0);
+}
+
+function statusBadgeVariant(status: BudgetLineStatus) {
+  if (status === "paid") return "default";
+  if (status === "skipped") return "secondary";
+  return "outline";
+}
+
 export function BudgetMonthView({ yearMonth, onYearMonthChange }: BudgetMonthViewProps) {
   const { data: month, isLoading, isError, error } = useBudgetMonth(yearMonth);
+  const year = yearMonth.slice(0, 4);
+  const {
+    data: annualTotals,
+    isLoading: annualLoading,
+    isError: annualIsError,
+    error: annualError,
+  } = useAnnualBudgetTotals(year);
   const createMonth = useCreateMonthFromTemplate();
   const [createOpen, setCreateOpen] = useState(false);
   const [addSection, setAddSection] = useState<BudgetSection>("income");
   const [addOpen, setAddOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [postLine, setPostLine] = useState<BudgetLine | null>(null);
+  const [editLedgerLine, setEditLedgerLine] = useState<BudgetLine | null>(null);
+  const [draftAmounts, setDraftAmounts] = useState<Record<number, number | undefined>>({});
 
   const addLine = useAddBudgetLine(yearMonth);
   const updateLine = useUpdateBudgetLine(yearMonth);
   const deleteLine = useDeleteBudgetLine(yearMonth);
   const postToLedger = usePostBudgetLineToLedger(yearMonth);
+  const updatePosted = useUpdatePostedBudgetLine(yearMonth);
+  const removeFromLedger = useRemoveBudgetLineFromLedger(yearMonth);
 
   const notFound =
     isError && error instanceof Error && error.message.includes("404");
@@ -64,15 +95,32 @@ export function BudgetMonthView({ yearMonth, onYearMonthChange }: BudgetMonthVie
   if (notFound || !month) {
     return (
       <>
-        <Card className="border-dashed border-primary/30">
-          <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
-            <p className="text-muted-foreground">
-              No budget sheet for{" "}
-              <span className="font-medium text-primary">{yearMonth}</span> yet.
-            </p>
-            <Button onClick={() => setCreateOpen(true)}>Create from template</Button>
-          </CardContent>
-        </Card>
+        <div className="space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <YearMonthTabs value={yearMonth} onChange={onYearMonthChange} />
+          </div>
+          <AnnualBudgetTotalsBar
+            year={year}
+            totals={annualTotals}
+            isLoading={annualLoading}
+            error={
+              annualIsError
+                ? annualError instanceof Error
+                  ? annualError
+                  : new Error(String(annualError))
+                : null
+            }
+          />
+          <Card className="border-dashed border-primary/30">
+            <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
+              <p className="text-muted-foreground">
+                No budget sheet for{" "}
+                <span className="font-medium text-primary">{yearMonth}</span> yet.
+              </p>
+              <Button onClick={() => setCreateOpen(true)}>Create from template</Button>
+            </CardContent>
+          </Card>
+        </div>
         <CreateMonthDialog
           open={createOpen}
           onOpenChange={setCreateOpen}
@@ -94,184 +142,110 @@ export function BudgetMonthView({ yearMonth, onYearMonthChange }: BudgetMonthVie
     );
   }
 
-  const handleAmountBlur = (line: BudgetLine, value: string) => {
-    const amount = Number(value);
-    if (!Number.isFinite(amount) || amount <= 0 || amount === line.amount) return;
-    updateLine.mutate({ id: line.id, data: { amount } });
+  const commitDraftAmount = (line: BudgetLine) => {
+    const draft = draftAmounts[line.id];
+    if (draft == null) return;
+    if (!Number.isFinite(draft) || draft <= 0 || draft === line.amount) return;
+    updateLine.mutate({
+      id: line.id,
+      data: { amount: draft },
+    });
+  };
+
+  const openAdd = (section: BudgetSection) => {
+    setAddSection(section);
+    setAddOpen(true);
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Input
-          type="month"
-          value={yearMonth}
-          onChange={(e) => onYearMonthChange(e.target.value)}
-          className="w-full sm:max-w-[200px]"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          className="border-primary/30"
-          onClick={() => setCreateOpen(true)}
-        >
-          New month from template
-        </Button>
+    <div className="space-y-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <YearMonthTabs value={yearMonth} onChange={onYearMonthChange} className="w-full sm:max-w-[460px]" />
+        <div className="flex flex-col gap-2 sm:ml-auto sm:flex-row sm:items-center">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="border-primary/30"
+            onClick={() => setCreateOpen(true)}
+          >
+            New month from template
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => {
+              setAddSection("income");
+              setQuickAddOpen(true);
+            }}
+          >
+            Add income/expense
+          </Button>
+        </div>
       </div>
+
+      <AnnualBudgetTotalsBar
+        year={year}
+        totals={annualTotals}
+        isLoading={annualLoading}
+        error={
+          annualIsError
+            ? annualError instanceof Error
+              ? annualError
+              : new Error(String(annualError))
+            : null
+        }
+      />
 
       <BudgetTotalsBar totals={month.totals} />
 
-      {SECTION_ORDER.map((section) => {
-        const lines = month.lines.filter((l) => l.section === section);
-        const sectionTotal = lines
-          .filter((l) => l.status !== "skipped")
-          .reduce((s, l) => s + l.amount, 0);
+      <Card className="border-primary/20">
+        <CardHeader className="space-y-1 px-4 py-3 sm:px-5">
+          <CardTitle className="text-base text-primary">
+            {yearMonth.replace("-", " · ")}
+          </CardTitle>
+          <CardDescription className="text-xs leading-snug sm:text-sm">
+            Edit amounts inline, then post planned lines to your ledger when paid.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-0 pb-0 sm:px-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className={compactHead}>Description</TableHead>
+                <TableHead className={cn(compactHead, "w-28 text-right")}>Amount</TableHead>
+                <TableHead className={cn(compactHead, "w-10")} />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {SECTION_ORDER.map((section) => {
+                const lines = month.lines.filter((line) => line.section === section);
+                const sectionTotal = sectionMonthTotal(month.lines, section);
 
-        return (
-          <Card key={section} className="border-primary/20">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-base text-primary">{SECTION_LABELS[section]}</CardTitle>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="gap-1"
-                onClick={() => {
-                  setAddSection(section);
-                  setAddOpen(true);
-                }}
-              >
-                <Plus className="h-4 w-4" />
-                Add line
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {lines.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No lines in this section.</p>
-              ) : (
-                <>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Description</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="w-[52px]" />
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {lines.map((line) => (
-                        <TableRow
-                          key={line.id}
-                          className={cn(
-                            line.status === "skipped" && "opacity-50",
-                            line.status === "paid" && "bg-income/5",
-                          )}
-                        >
-                          <TableCell>{line.description}</TableCell>
-                          <TableCell className="text-right">
-                            {line.status === "paid" ? (
-                              <Numeric value={line.amount} />
-                            ) : (
-                              <Input
-                                type="number"
-                                className="ml-auto h-8 w-28 text-right font-mono-numeric"
-                                defaultValue={line.amount}
-                                disabled={line.status === "skipped"}
-                                onBlur={(e) => handleAmountBlur(line, e.target.value)}
-                              />
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                line.status === "paid"
-                                  ? "default"
-                                  : line.status === "skipped"
-                                    ? "secondary"
-                                    : "outline"
-                              }
-                            >
-                              {line.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  type="button"
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-8 w-8"
-                                  aria-label="Actions"
-                                >
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                {line.status === "planned" && (
-                                  <>
-                                    <DropdownMenuItem onClick={() => setPostLine(line)}>
-                                      <Check className="mr-2 h-4 w-4" />
-                                      Post to ledger
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onClick={() =>
-                                        updateLine.mutate({
-                                          id: line.id,
-                                          data: { status: "skipped" },
-                                        })
-                                      }
-                                    >
-                                      <SkipForward className="mr-2 h-4 w-4" />
-                                      Skip
-                                    </DropdownMenuItem>
-                                  </>
-                                )}
-                                {line.status === "skipped" && (
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      updateLine.mutate({
-                                        id: line.id,
-                                        data: { status: "planned" },
-                                      })
-                                    }
-                                  >
-                                    Restore to planned
-                                  </DropdownMenuItem>
-                                )}
-                                {!line.transactionId && (
-                                  <DropdownMenuItem
-                                    className="text-expense"
-                                    onClick={() => deleteLine.mutate(line.id)}
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  <p className="mt-2 text-right text-sm text-muted-foreground">
-                    Subtotal:{" "}
-                    <Numeric
-                      value={sectionTotal}
-                      className={cn(
-                        "font-semibold",
-                        section === "income" ? "text-income" : "text-expense",
-                      )}
-                    />
-                  </p>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
+                return (
+                  <MonthSectionRows
+                    key={section}
+                    section={section}
+                    lines={lines}
+                    sectionTotal={sectionTotal}
+                    onAdd={() => openAdd(section)}
+                    onPost={setPostLine}
+                    onEditLedger={setEditLedgerLine}
+                    onRemoveFromLedger={(id) => removeFromLedger.mutate(id)}
+                    onUpdate={(id, data) => updateLine.mutate({ id, data })}
+                    onDelete={(id) => deleteLine.mutate(id)}
+                    draftAmounts={draftAmounts}
+                    setDraftAmount={(lineId, next) =>
+                      setDraftAmounts((prev) => ({ ...prev, [lineId]: next }))
+                    }
+                    onCommitDraftAmount={commitDraftAmount}
+                  />
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       <AddBudgetLineDialog
         open={addOpen}
@@ -279,7 +253,79 @@ export function BudgetMonthView({ yearMonth, onYearMonthChange }: BudgetMonthVie
         defaultSection={addSection}
         isPending={addLine.isPending}
         onSubmit={(values: BudgetLineFormValues) => {
-          addLine.mutate(values, { onSuccess: () => setAddOpen(false) });
+          addLine.mutate(
+            {
+              description: values.description,
+              amount: values.amount,
+              financeType: values.financeType,
+              section: values.section,
+              plannedDate: values.plannedDate ?? null,
+              itemType: values.itemType,
+              savingsBucket: values.savingsBucket,
+              featureCategory: values.featureCategory ?? null,
+              fixedDepositDate:
+                values.section === "savings" && values.itemType === "fixed_deposit"
+                  ? values.fixedDepositDate ?? undefined
+                  : undefined,
+              fixedDepositMaturityMonths:
+                values.section === "savings" && values.itemType === "fixed_deposit"
+                  ? values.fixedDepositMaturityMonths ?? undefined
+                  : undefined,
+              fixedDepositInterestRate:
+                values.section === "savings" && values.itemType === "fixed_deposit"
+                  ? values.fixedDepositInterestRate ?? undefined
+                  : undefined,
+            },
+            {
+              onSuccess: (line) => {
+                setAddOpen(false);
+                if (!values.postToLedger) return;
+                const date = values.plannedDate ? new Date(values.plannedDate) : new Date();
+                postToLedger.mutate({ id: line.id, date, amount: line.amount });
+              },
+            },
+          );
+        }}
+      />
+
+      <AddBudgetLineDialog
+        open={quickAddOpen}
+        onOpenChange={setQuickAddOpen}
+        defaultSection="income"
+        isPending={addLine.isPending}
+        onSubmit={(values: BudgetLineFormValues) => {
+          addLine.mutate(
+            {
+              description: values.description,
+              amount: values.amount,
+              financeType: values.financeType,
+              section: values.section,
+              plannedDate: values.plannedDate ?? null,
+              itemType: values.itemType,
+              savingsBucket: values.savingsBucket,
+              featureCategory: values.featureCategory ?? null,
+              fixedDepositDate:
+                values.section === "savings" && values.itemType === "fixed_deposit"
+                  ? values.fixedDepositDate ?? undefined
+                  : undefined,
+              fixedDepositMaturityMonths:
+                values.section === "savings" && values.itemType === "fixed_deposit"
+                  ? values.fixedDepositMaturityMonths ?? undefined
+                  : undefined,
+              fixedDepositInterestRate:
+                values.section === "savings" && values.itemType === "fixed_deposit"
+                  ? values.fixedDepositInterestRate ?? undefined
+                  : undefined,
+            },
+            {
+              onSuccess: (line) => {
+                setQuickAddOpen(false);
+                if (!values.postToLedger) return;
+                const date = values.plannedDate ? new Date(values.plannedDate) : new Date();
+                postToLedger.mutate({ id: line.id, date, amount: line.amount });
+              },
+            },
+          );
         }}
       />
 
@@ -293,6 +339,25 @@ export function BudgetMonthView({ yearMonth, onYearMonthChange }: BudgetMonthVie
           postToLedger.mutate(
             { id: postLine.id, date: values.date, amount: values.amount },
             { onSuccess: () => setPostLine(null) },
+          );
+        }}
+      />
+
+      <EditLedgerEntryDialog
+        open={editLedgerLine != null}
+        onOpenChange={(open) => !open && setEditLedgerLine(null)}
+        line={editLedgerLine}
+        isPending={updatePosted.isPending}
+        onSubmit={(values) => {
+          if (!editLedgerLine) return;
+          updatePosted.mutate(
+            {
+              id: editLedgerLine.id,
+              date: values.date,
+              amount: values.amount,
+              description: values.description,
+            },
+            { onSuccess: () => setEditLedgerLine(null) },
           );
         }}
       />
@@ -315,5 +380,181 @@ export function BudgetMonthView({ yearMonth, onYearMonthChange }: BudgetMonthVie
         }}
       />
     </div>
+  );
+}
+
+interface MonthSectionRowsProps {
+  section: BudgetSection;
+  lines: BudgetLine[];
+  sectionTotal: number;
+  onAdd: () => void;
+  onPost: (line: BudgetLine) => void;
+  onEditLedger: (line: BudgetLine) => void;
+  onRemoveFromLedger: (id: number) => void;
+  onUpdate: (id: number, data: { status: BudgetLineStatus }) => void;
+  onDelete: (id: number) => void;
+  draftAmounts: Record<number, number | undefined>;
+  setDraftAmount: (lineId: number, next: number | undefined) => void;
+  onCommitDraftAmount: (line: BudgetLine) => void;
+}
+
+function MonthSectionRows({
+  section,
+  lines,
+  sectionTotal,
+  onAdd,
+  onPost,
+  onEditLedger,
+  onRemoveFromLedger,
+  onUpdate,
+  onDelete,
+  draftAmounts,
+  setDraftAmount,
+  onCommitDraftAmount,
+}: MonthSectionRowsProps) {
+  return (
+    <>
+      <TableRow className="border-primary/15 bg-secondary/40 hover:bg-secondary/40">
+        <TableCell colSpan={3} className={cn(compactCell, "py-2")}>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-primary">{SECTION_LABELS[section]}</span>
+            {lines.length > 0 && (
+              <span className="text-xs text-muted-foreground">({lines.length})</span>
+            )}
+            <span className="ml-auto text-xs text-muted-foreground">
+              {lines.length > 0 ? (
+                <>
+                  Subtotal{" "}
+                  <Numeric
+                    value={sectionTotal}
+                    className={cn(
+                      "font-medium",
+                      section === "income" ? "text-income" : "text-expense",
+                    )}
+                  />
+                </>
+              ) : (
+                "No lines"
+              )}
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 shrink-0 gap-1 px-2 text-primary"
+              onClick={onAdd}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span className="sr-only sm:not-sr-only sm:inline">Add</span>
+            </Button>
+          </div>
+        </TableCell>
+      </TableRow>
+      {lines.map((line) => (
+        <TableRow
+          key={line.id}
+          className={cn(
+            line.status === "skipped" && "opacity-50",
+            line.status === "paid" && "bg-income/5",
+          )}
+        >
+          <TableCell className={compactCell}>
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <span className="truncate text-sm">{line.description}</span>
+              {line.itemType === "fixed_deposit" ? (
+                <Badge
+                  variant="secondary"
+                  className="w-fit px-1.5 py-0 text-[10px] font-normal"
+                >
+                  FD
+                  {line.fixedDepositMaturityMonths
+                    ? ` · ${line.fixedDepositMaturityMonths} mo`
+                    : ""}
+                  {line.fixedDepositInterestRate != null
+                    ? ` · ${line.fixedDepositInterestRate}%`
+                    : ""}
+                  {line.fixedDepositDate ? ` · ${line.fixedDepositDate}` : ""}
+                </Badge>
+              ) : null}
+              <Badge
+                variant={statusBadgeVariant(line.status)}
+                className="w-fit px-1.5 py-0 text-[10px] font-normal capitalize"
+              >
+                {line.status}
+              </Badge>
+            </div>
+          </TableCell>
+          <TableCell className={cn(compactCell, "text-right")}>
+            {line.status === "paid" ? (
+              <Numeric value={line.amount} className="text-sm" />
+            ) : (
+              <AmountInput
+                value={draftAmounts[line.id] ?? line.amount}
+                onChange={(v) => setDraftAmount(line.id, v)}
+                disabled={line.status === "skipped"}
+                className="ml-auto h-7 w-24 text-right text-sm"
+                onBlur={() => onCommitDraftAmount(line)}
+              />
+            )}
+          </TableCell>
+          <TableCell className={cn(compactCell, "w-10 p-1")}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  aria-label={`Actions for ${line.description}`}
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {line.transactionId ? (
+                  <>
+                    <DropdownMenuItem onClick={() => onEditLedger(line)}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-expense"
+                      onClick={() => onRemoveFromLedger(line.id)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <>
+                    {line.status === "planned" && (
+                      <>
+                        <DropdownMenuItem onClick={() => onPost(line)}>
+                          <Check className="mr-2 h-4 w-4" />
+                          Post to ledger
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onUpdate(line.id, { status: "skipped" })}>
+                          <SkipForward className="mr-2 h-4 w-4" />
+                          Skip
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    {line.status === "skipped" && (
+                      <DropdownMenuItem onClick={() => onUpdate(line.id, { status: "planned" })}>
+                        Restore to planned
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem className="text-expense" onClick={() => onDelete(line.id)}>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TableCell>
+        </TableRow>
+      ))}
+    </>
   );
 }

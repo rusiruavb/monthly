@@ -13,6 +13,10 @@ export const recurringItemSchema = z.object({
     .optional(),
   financeType: z.enum(FINANCE_TYPES),
   section: budgetSection,
+  itemType: z.enum(["regular", "fixed_deposit"]).optional(),
+  fixedDepositDay: z.coerce.number().int().min(1).max(31).optional().nullable(),
+  fixedDepositMaturityMonths: z.coerce.number().int().min(1).optional().nullable(),
+  fixedDepositInterestRate: z.coerce.number().min(0).max(100).optional().nullable(),
   sortOrder: z.coerce.number().int().min(0).optional(),
   isActive: z.boolean().optional(),
   amountSource: amountSource.optional(),
@@ -26,6 +30,14 @@ export const budgetLineSchema = z.object({
   amount: z.coerce.number().positive("Amount must be greater than 0"),
   financeType: z.enum(FINANCE_TYPES),
   section: budgetSection,
+  plannedDate: z.string().optional().nullable(),
+  postToLedger: z.boolean().optional(),
+  itemType: z.enum(["regular", "fixed_deposit"]).optional(),
+  savingsBucket: z.enum(["savings", "one_off"]).optional(),
+  featureCategory: z.string().optional().nullable(),
+  fixedDepositDate: z.string().optional().nullable(),
+  fixedDepositMaturityMonths: z.coerce.number().int().min(1).optional().nullable(),
+  fixedDepositInterestRate: z.coerce.number().min(0).max(100).optional().nullable(),
 });
 
 export type BudgetLineFormValues = z.infer<typeof budgetLineSchema>;

@@ -1,4 +1,14 @@
 import "dotenv/config";
+import { startServer } from "./start-server.js";
+
+const started = await startServer();
+
+console.log(`Monthly running on http://${started.host}:${started.port}`);
+if (process.env.NODE_ENV === "production") {
+  console.log(`Data directory: ${process.env.DATA_DIR ?? "./data"}`);
+}
+
+import "dotenv/config";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import cors from "cors";
@@ -12,8 +22,10 @@ import {
   exportAllData,
   getLoan,
   getPayment,
+  linkPaymentToTransaction,
   listLoans,
   listPayments,
+  unlinkPaymentTransaction,
   updateLoan,
   updatePaymentAttachment,
   updatePaymentStatus,
@@ -25,11 +37,14 @@ import {
   deleteRecurringItem,
   duplicateMonthFromTemplate,
   getBudgetLine,
+  getAnnualBudgetTotals,
   getMonthDetail,
   getRecurringItem,
   listMonthlyBudgets,
   listRecurringItems,
   postLineToLedger,
+  removeLineFromLedger,
+  updatePostedLineInLedger,
   updateBudgetLine,
   updateRecurringItem,
 } from "./db/budget.js";
@@ -47,6 +62,12 @@ function mapRecurringItem(r: ReturnType<typeof listRecurringItems>[number]) {
     amount: r.amount,
     financeType: r.finance_type,
     section: r.section,
+    itemType: r.item_type,
+    savingsBucket: r.savings_bucket,
+    featureCategory: r.feature_category,
+    fixedDepositDay: r.fixed_deposit_day,
+    fixedDepositMaturityMonths: r.fixed_deposit_maturity_months,
+    fixedDepositInterestRate: r.fixed_deposit_interest_rate,
     sortOrder: r.sort_order,
     isActive: Boolean(r.is_active),
     amountSource: r.amount_source,
@@ -62,6 +83,13 @@ function mapBudgetLine(l: NonNullable<ReturnType<typeof getMonthDetail>>["lines"
     amount: l.amount,
     financeType: l.finance_type,
     section: l.section,
+    itemType: l.item_type,
+    savingsBucket: l.savings_bucket,
+    featureCategory: l.feature_category,
+    plannedDate: l.planned_date,
+    fixedDepositDate: l.fixed_deposit_date,
+    fixedDepositMaturityMonths: l.fixed_deposit_maturity_months,
+    fixedDepositInterestRate: l.fixed_deposit_interest_rate,
     sortOrder: l.sort_order,
     status: l.status,
     transactionId: l.transaction_id,
@@ -107,6 +135,8 @@ app.get("/api/transactions", (_req, res) => {
         amount: r.amount,
         description: r.description,
         financeType: r.finance_type,
+        category: r.category ?? "",
+        loanPaymentId: r.loan_payment_id ?? null,
         driveLink: fileUrl(r.attachment_path),
         fileName: r.attachment_name ?? "",
       })),
@@ -118,11 +148,13 @@ app.get("/api/transactions", (_req, res) => {
 
 app.post("/api/transactions", upload.single("file"), (req, res) => {
   try {
-    const { date, amount, description, financeType } = req.body as {
+    const { date, amount, description, financeType, category, loanPaymentId } = req.body as {
       date: string;
       amount: string;
       description: string;
       financeType: string;
+      category?: string;
+      loanPaymentId?: string;
     };
     let attachmentPath: string | null = null;
     let attachmentName: string | null = null;
@@ -136,9 +168,19 @@ app.post("/api/transactions", upload.single("file"), (req, res) => {
       amount: Number(amount),
       description: description ?? "",
       financeType,
+      category: category?.trim() ? category.trim() : null,
+      loanPaymentId:
+        loanPaymentId != null && String(loanPaymentId).trim()
+          ? Number(loanPaymentId)
+          : null,
       attachmentPath,
       attachmentName,
     });
+
+    if (loanPaymentId != null && String(loanPaymentId).trim()) {
+      linkPaymentToTransaction(Number(loanPaymentId), id);
+    }
+
     res.json({ rowIndex: id });
   } catch (error) {
     res.status(500).json({ error: String(error) });
@@ -148,13 +190,15 @@ app.post("/api/transactions", upload.single("file"), (req, res) => {
 app.put("/api/transactions/:id", upload.single("file"), (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { date, amount, description, financeType, keepAttachment } =
+    const { date, amount, description, financeType, keepAttachment, category, loanPaymentId } =
       req.body as {
         date: string;
         amount: string;
         description: string;
         financeType: string;
         keepAttachment?: string;
+        category?: string;
+        loanPaymentId?: string;
       };
     const existing = listTransactions().find((t) => t.id === id);
     if (!existing) {
@@ -170,14 +214,31 @@ app.put("/api/transactions/:id", upload.single("file"), (req, res) => {
       attachmentPath = saved.path;
       attachmentName = saved.name;
     }
+
+    const nextLoanPaymentId =
+      loanPaymentId != null && String(loanPaymentId).trim()
+        ? Number(loanPaymentId)
+        : null;
+
+    if (existing.loan_payment_id != null && existing.loan_payment_id !== nextLoanPaymentId) {
+      unlinkPaymentTransaction(existing.loan_payment_id, id);
+    }
+
     updateTransaction(id, {
       date,
       amount: Number(amount),
       description: description ?? "",
       financeType,
+      category: category?.trim() ? category.trim() : null,
+      loanPaymentId: nextLoanPaymentId,
       attachmentPath,
       attachmentName,
     });
+
+    if (nextLoanPaymentId != null) {
+      linkPaymentToTransaction(nextLoanPaymentId, id);
+    }
+
     res.json({ ok: true });
   } catch (error) {
     res.status(500).json({ error: String(error) });
@@ -186,7 +247,12 @@ app.put("/api/transactions/:id", upload.single("file"), (req, res) => {
 
 app.delete("/api/transactions/:id", (req, res) => {
   try {
-    deleteTransaction(Number(req.params.id));
+    const id = Number(req.params.id);
+    const existing = listTransactions().find((t) => t.id === id);
+    if (existing?.loan_payment_id != null) {
+      unlinkPaymentTransaction(existing.loan_payment_id, id);
+    }
+    deleteTransaction(id);
     res.json({ ok: true });
   } catch (error) {
     res.status(500).json({ error: String(error) });
@@ -204,7 +270,21 @@ app.get("/api/budget/templates", (_req, res) => {
 
 app.post("/api/budget/templates", (req, res) => {
   try {
-    const { description, amount, financeType, section, sortOrder, amountSource, frequency } =
+    const {
+      description,
+      amount,
+      financeType,
+      section,
+      sortOrder,
+      amountSource,
+      frequency,
+      itemType,
+      savingsBucket,
+      featureCategory,
+      fixedDepositDay,
+      fixedDepositMaturityMonths,
+      fixedDepositInterestRate,
+    } =
       req.body as {
         description: string;
         amount?: number;
@@ -213,6 +293,12 @@ app.post("/api/budget/templates", (req, res) => {
         sortOrder?: number;
         amountSource?: string;
         frequency?: string;
+        itemType?: string;
+        savingsBucket?: string;
+        featureCategory?: string | null;
+        fixedDepositDay?: number;
+        fixedDepositMaturityMonths?: number;
+        fixedDepositInterestRate?: number;
       };
     const id = createRecurringItem({
       description,
@@ -220,6 +306,21 @@ app.post("/api/budget/templates", (req, res) => {
         amount != null && !Number.isNaN(Number(amount)) ? Number(amount) : undefined,
       financeType,
       section: section as "income" | "fixed" | "variable" | "savings",
+      itemType: itemType === "fixed_deposit" ? "fixed_deposit" : "regular",
+      savingsBucket: savingsBucket === "one_off" ? "one_off" : "savings",
+      featureCategory: featureCategory ?? null,
+      fixedDepositDay:
+        fixedDepositDay != null && Number.isFinite(Number(fixedDepositDay))
+          ? Number(fixedDepositDay)
+          : undefined,
+      fixedDepositMaturityMonths:
+        fixedDepositMaturityMonths != null && Number.isFinite(Number(fixedDepositMaturityMonths))
+          ? Number(fixedDepositMaturityMonths)
+          : undefined,
+      fixedDepositInterestRate:
+        fixedDepositInterestRate != null && Number.isFinite(Number(fixedDepositInterestRate))
+          ? Number(fixedDepositInterestRate)
+          : undefined,
       sortOrder,
       amountSource: amountSource as "template" | "previous_month" | undefined,
       frequency: frequency as "monthly" | "manual_only" | undefined,
@@ -239,7 +340,22 @@ app.put("/api/budget/templates/:id", (req, res) => {
       res.status(404).json({ error: "Template item not found" });
       return;
     }
-    const { description, amount, financeType, section, sortOrder, isActive, amountSource, frequency } =
+    const {
+      description,
+      amount,
+      financeType,
+      section,
+      sortOrder,
+      isActive,
+      amountSource,
+      frequency,
+      itemType,
+      savingsBucket,
+      featureCategory,
+      fixedDepositDay,
+      fixedDepositMaturityMonths,
+      fixedDepositInterestRate,
+    } =
       req.body as {
         description: string;
         amount?: number;
@@ -249,6 +365,12 @@ app.put("/api/budget/templates/:id", (req, res) => {
         isActive: boolean;
         amountSource: string;
         frequency: string;
+        itemType?: string;
+        savingsBucket?: string;
+        featureCategory?: string | null;
+        fixedDepositDay?: number;
+        fixedDepositMaturityMonths?: number;
+        fixedDepositInterestRate?: number;
       };
     updateRecurringItem(id, {
       description,
@@ -256,6 +378,21 @@ app.put("/api/budget/templates/:id", (req, res) => {
         amount != null && !Number.isNaN(Number(amount)) ? Number(amount) : undefined,
       financeType,
       section: section as "income" | "fixed" | "variable" | "savings",
+      itemType: itemType === "fixed_deposit" ? "fixed_deposit" : "regular",
+      savingsBucket: savingsBucket === "one_off" ? "one_off" : "savings",
+      featureCategory: featureCategory ?? null,
+      fixedDepositDay:
+        fixedDepositDay != null && Number.isFinite(Number(fixedDepositDay))
+          ? Number(fixedDepositDay)
+          : undefined,
+      fixedDepositMaturityMonths:
+        fixedDepositMaturityMonths != null && Number.isFinite(Number(fixedDepositMaturityMonths))
+          ? Number(fixedDepositMaturityMonths)
+          : undefined,
+      fixedDepositInterestRate:
+        fixedDepositInterestRate != null && Number.isFinite(Number(fixedDepositInterestRate))
+          ? Number(fixedDepositInterestRate)
+          : undefined,
       sortOrder: Number(sortOrder),
       isActive: Boolean(isActive),
       amountSource: amountSource as "template" | "previous_month",
@@ -359,18 +496,51 @@ app.post("/api/budget/months/:yearMonth/from-template", (req, res) => {
 
 app.post("/api/budget/months/:yearMonth/lines", (req, res) => {
   try {
-    const { description, amount, financeType, section, sortOrder } = req.body as {
+    const {
+      description,
+      amount,
+      financeType,
+      section,
+      sortOrder,
+      itemType,
+      savingsBucket,
+      featureCategory,
+      plannedDate,
+      fixedDepositDate,
+      fixedDepositMaturityMonths,
+      fixedDepositInterestRate,
+    } = req.body as {
       description: string;
       amount: number;
       financeType: string;
       section: string;
       sortOrder?: number;
+      itemType?: string;
+      savingsBucket?: string;
+      featureCategory?: string | null;
+      plannedDate?: string | null;
+      fixedDepositDate?: string;
+      fixedDepositMaturityMonths?: number;
+      fixedDepositInterestRate?: number;
     };
     const id = createBudgetLine(req.params.yearMonth, {
       description,
       amount: Number(amount),
       financeType,
       section: section as "income" | "fixed" | "variable" | "savings",
+      itemType: itemType === "fixed_deposit" ? "fixed_deposit" : "regular",
+      savingsBucket: savingsBucket === "one_off" ? "one_off" : "savings",
+      featureCategory: featureCategory ?? null,
+      plannedDate: plannedDate ?? null,
+      fixedDepositDate,
+      fixedDepositMaturityMonths:
+        fixedDepositMaturityMonths != null && Number.isFinite(Number(fixedDepositMaturityMonths))
+          ? Number(fixedDepositMaturityMonths)
+          : undefined,
+      fixedDepositInterestRate:
+        fixedDepositInterestRate != null && Number.isFinite(Number(fixedDepositInterestRate))
+          ? Number(fixedDepositInterestRate)
+          : undefined,
       sortOrder,
     });
     const detail = getMonthDetail(req.params.yearMonth);
@@ -394,19 +564,50 @@ app.put("/api/budget/lines/:id", (req, res) => {
       res.status(404).json({ error: "Budget line not found" });
       return;
     }
-    const { description, amount, financeType, section, sortOrder, status } = req.body as {
+    const {
+      description,
+      amount,
+      financeType,
+      section,
+      sortOrder,
+      status,
+      itemType,
+      savingsBucket,
+      featureCategory,
+      fixedDepositDate,
+      fixedDepositMaturityMonths,
+      fixedDepositInterestRate,
+    } = req.body as {
       description?: string;
       amount?: number;
       financeType?: string;
       section?: string;
       sortOrder?: number;
       status?: string;
+      itemType?: string;
+      savingsBucket?: string;
+      featureCategory?: string | null;
+      fixedDepositDate?: string | null;
+      fixedDepositMaturityMonths?: number | null;
+      fixedDepositInterestRate?: number | null;
     };
     updateBudgetLine(id, {
       description,
       amount: amount !== undefined ? Number(amount) : undefined,
       financeType,
       section: section as "income" | "fixed" | "variable" | "savings" | undefined,
+      itemType: itemType === "fixed_deposit" ? "fixed_deposit" : undefined,
+      savingsBucket: savingsBucket === "one_off" ? "one_off" : undefined,
+      featureCategory: featureCategory ?? undefined,
+      fixedDepositDate,
+      fixedDepositMaturityMonths:
+        fixedDepositMaturityMonths !== undefined && fixedDepositMaturityMonths !== null
+          ? Number(fixedDepositMaturityMonths)
+          : fixedDepositMaturityMonths,
+      fixedDepositInterestRate:
+        fixedDepositInterestRate !== undefined && fixedDepositInterestRate !== null
+          ? Number(fixedDepositInterestRate)
+          : fixedDepositInterestRate,
       sortOrder: sortOrder !== undefined ? Number(sortOrder) : undefined,
       status: status as "planned" | "paid" | "skipped" | undefined,
     });
@@ -460,6 +661,68 @@ app.post("/api/budget/lines/:id/post-to-ledger", (req, res) => {
       res.status(400).json({ error: err.message });
       return;
     }
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+app.put("/api/budget/lines/:id/ledger", (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { date, amount, description } = (req.body ?? {}) as {
+      date?: string;
+      amount?: number;
+      description?: string;
+    };
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      res.status(400).json({ error: "Invalid date format (use yyyy-MM-dd)" });
+      return;
+    }
+    if (amount == null || !Number.isFinite(Number(amount)) || Number(amount) <= 0) {
+      res.status(400).json({ error: "Invalid amount" });
+      return;
+    }
+    updatePostedLineInLedger(id, {
+      date,
+      amount: Number(amount),
+      description,
+    });
+    const line = getBudgetLine(id);
+    res.json({ line: mapBudgetLine(line!) });
+  } catch (error) {
+    const err = error as Error;
+    if (err.message.includes("not found")) {
+      res.status(404).json({ error: err.message });
+      return;
+    }
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete("/api/budget/lines/:id/ledger", (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    removeLineFromLedger(id);
+    res.json({ ok: true });
+  } catch (error) {
+    const err = error as Error;
+    if (err.message.includes("not found")) {
+      res.status(404).json({ error: err.message });
+      return;
+    }
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Annual budget totals (aggregated across existing months)
+app.get("/api/budget/years/:year/totals", (req, res) => {
+  try {
+    const year = req.params.year;
+    if (!/^\d{4}$/.test(year)) {
+      res.status(400).json({ error: "Invalid year format (use yyyy)" });
+      return;
+    }
+    res.json(getAnnualBudgetTotals(year));
+  } catch (error) {
     res.status(500).json({ error: String(error) });
   }
 });
@@ -618,7 +881,7 @@ app.get("/api/files/:filename", (req, res) => {
 app.get("/api/export", (_req, res) => {
   try {
     const data = exportAllData();
-    const filename = `cfima-export-${new Date().toISOString().slice(0, 10)}.json`;
+    const filename = `monthly-export-${new Date().toISOString().slice(0, 10)}.json`;
     res.setHeader("Content-Type", "application/json");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(JSON.stringify(data, null, 2));
@@ -640,7 +903,7 @@ const PORT = Number(process.env.PORT ?? 3001);
 const HOST = process.env.HOST ?? "0.0.0.0";
 
 app.listen(PORT, HOST, () => {
-  console.log(`CFiMa running on http://${HOST}:${PORT}`);
+  console.log(`Monthly running on http://${HOST}:${PORT}`);
   if (isProduction) {
     console.log(`Data directory: ${process.env.DATA_DIR ?? "./data"}`);
   }

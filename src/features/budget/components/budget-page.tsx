@@ -4,16 +4,17 @@ import { Button } from "@/components/ui/button";
 import { BudgetMonthView } from "@/features/budget/components/budget-month-view";
 import { BudgetTemplateSection } from "@/features/budget/components/budget-template-section";
 import { currentYearMonth } from "@/features/budget/services/budget-api";
+import { IncomeExpensePanel } from "@/features/income-expense";
 import { cn } from "@/shared/lib/utils";
 
-type BudgetTab = "month" | "template";
+type BudgetTab = "month" | "ledger" | "template";
 
 export function BudgetPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const monthParam = searchParams.get("month");
   const [tab, setTab] = useState<BudgetTab>(
-    tabParam === "template" ? "template" : "month",
+    tabParam === "template" ? "template" : tabParam === "ledger" ? "ledger" : "month",
   );
   const [yearMonth, setYearMonth] = useState(monthParam ?? currentYearMonth());
 
@@ -36,9 +37,9 @@ export function BudgetPage() {
   return (
     <div className="space-y-6 sm:space-y-8">
       <div>
-        <h1 className="text-xl font-semibold text-primary sm:text-2xl">Monthly Budget</h1>
+        <h1 className="text-xl font-semibold text-primary sm:text-2xl">Monthly</h1>
         <p className="text-sm text-muted-foreground">
-          Plan income and expenses by month, then post to your ledger when paid
+          Plan your month, then track actuals in the ledger
         </p>
       </div>
 
@@ -53,6 +54,14 @@ export function BudgetPage() {
         </Button>
         <Button
           type="button"
+          variant={tab === "ledger" ? "default" : "ghost"}
+          className={cn("flex-1", tab !== "ledger" && "text-primary")}
+          onClick={() => setTabAndUrl("ledger")}
+        >
+          Ledger
+        </Button>
+        <Button
+          type="button"
           variant={tab === "template" ? "default" : "ghost"}
           className={cn("flex-1", tab !== "template" && "text-primary")}
           onClick={() => setTabAndUrl("template")}
@@ -63,6 +72,8 @@ export function BudgetPage() {
 
       {tab === "month" ? (
         <BudgetMonthView yearMonth={yearMonth} onYearMonthChange={setYearMonthAndUrl} />
+      ) : tab === "ledger" ? (
+        <IncomeExpensePanel />
       ) : (
         <BudgetTemplateSection />
       )}

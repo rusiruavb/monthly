@@ -62,6 +62,19 @@ export async function fetchBudgetMonth(
   );
 }
 
+export type AnnualBudgetTotals = {
+  year: string;
+  incomeTotal: number;
+  expenseTotal: number;
+  savingsTotal: number;
+  fixedDepositTotal: number;
+  remaining: number;
+};
+
+export async function fetchAnnualBudgetTotals(year: string): Promise<AnnualBudgetTotals> {
+  return request<AnnualBudgetTotals>(`/budget/years/${encodeURIComponent(year)}/totals`);
+}
+
 export async function createMonthFromTemplate(
   yearMonth: string,
   amountMode: AmountMode = "template",
@@ -84,6 +97,13 @@ export async function addBudgetLine(
     amount: number;
     financeType: string;
     section: string;
+    plannedDate?: string | null;
+    itemType?: string;
+    savingsBucket?: string;
+    featureCategory?: string | null;
+    fixedDepositDate?: string;
+    fixedDepositMaturityMonths?: number;
+    fixedDepositInterestRate?: number;
   },
 ): Promise<BudgetLine> {
   return request<BudgetLine>(
@@ -104,6 +124,10 @@ export async function updateBudgetLine(
     financeType: string;
     section: string;
     status: string;
+    itemType: string;
+    fixedDepositDate: string | null;
+    fixedDepositMaturityMonths: number | null;
+    fixedDepositInterestRate: number | null;
   }>,
 ): Promise<BudgetLine> {
   return request<BudgetLine>(`/budget/lines/${id}`, {
@@ -129,6 +153,25 @@ export async function postBudgetLineToLedger(
       amount: data.amount,
     }),
   });
+}
+
+export async function updateBudgetLineLedger(
+  id: number,
+  data: { date: Date; amount: number; description?: string },
+): Promise<{ line: BudgetLine }> {
+  return request(`/budget/lines/${id}/ledger`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      date: format(data.date, "yyyy-MM-dd"),
+      amount: data.amount,
+      description: data.description,
+    }),
+  });
+}
+
+export async function removeBudgetLineFromLedger(id: number): Promise<void> {
+  await request(`/budget/lines/${id}/ledger`, { method: "DELETE" });
 }
 
 export function currentYearMonth(): string {

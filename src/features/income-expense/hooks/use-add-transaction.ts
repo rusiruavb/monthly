@@ -13,6 +13,8 @@ export function useAddTransaction() {
         amount: data.amount,
         description: data.description,
         financeType: data.financeType,
+        category: data.category,
+        loanPaymentId: data.category === "Loans" ? (data.loanPaymentId ?? null) : null,
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: INCOME_EXPENSE_QUERY_KEY });

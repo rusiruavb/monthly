@@ -8,6 +8,8 @@ export interface Transaction {
   amount: number;
   description: string;
   financeType: FinanceType;
+  category?: string;
+  loanPaymentId?: number | null;
   driveLink: string;
   fileName: string;
 }
