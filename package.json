@@ -1,6 +1,6 @@
 {
   "name": "monthly",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "main": "dist-electron/main.cjs",
@@ -14,7 +14,9 @@
     "build:server": "tsc -p tsconfig.server.build.json && cpy \"server/db/schema.sql\" \"dist-server/db/\" --flat",
     "build:electron": "tsup --config tsup.electron.config.ts",
     "build:desktop": "pnpm build && pnpm build:server && pnpm build:electron",
-    "dist": "pnpm build:desktop && electron-builder",
+    "dist": "pnpm build:desktop && electron-builder --mac",
+    "dist:win": "pnpm build:desktop && electron-builder --win --x64",
+    "dist:mac": "pnpm build:desktop && electron-builder --mac",
     "start": "tsx server/index.ts",
     "preview": "vite preview",
     "lint": "eslint src server"
@@ -89,8 +91,8 @@
     "wait-on": "^9.0.10"
   },
   "build": {
-    "appId": "com.cfima.desktop",
-    "productName": "CFIMA",
+    "appId": "com.monthly.desktop",
+    "productName": "Monthly",
     "icon": "build/icon.png",
     "directories": {
       "output": "release"
@@ -115,11 +117,21 @@
       },
       "iconSize": 80,
       "contents": [
-        { "x": 130, "y": 220, "type": "file" },
-        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+        {
+          "x": 130,
+          "y": 220,
+          "type": "file"
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
       ]
     },
     "mac": {
+      "identity": null,
       "target": [
         "dmg"
       ]

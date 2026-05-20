@@ -5,7 +5,6 @@ export const INCOME_EXPENSE_HEADERS = [
   "amount",
   "description",
   "finance type",
-  "google drive link",
 ] as const;
 
 export const LOAN_PAYMENT_HEADERS = [

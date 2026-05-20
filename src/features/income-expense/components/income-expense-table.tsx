@@ -47,7 +47,9 @@ export function IncomeExpenseTable() {
   const { data = [], isLoading, isError, refetch } = useIncomeExpenses();
   const { data: loans = [] } = useLoans();
   const deleteMutation = useDeleteTransaction();
-  const [filters, setFilters] = useState<TransactionFilters>(DEFAULT_TRANSACTION_FILTERS);
+  const [filters, setFilters] = useState<TransactionFilters>(
+    DEFAULT_TRANSACTION_FILTERS,
+  );
   const [sort, setSort] = useState<TransactionSort>(DEFAULT_TRANSACTION_SORT);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [deleting, setDeleting] = useState<Transaction | null>(null);
@@ -71,7 +73,11 @@ export function IncomeExpenseTable() {
     return (
       <div className="rounded-lg border border-expense/30 p-8 text-center">
         <p className="text-expense">Failed to load transactions.</p>
-        <Button variant="outline" className="mt-4" onClick={() => void refetch()}>
+        <Button
+          variant="outline"
+          className="mt-4"
+          onClick={() => void refetch()}
+        >
           Retry
         </Button>
       </div>
@@ -104,32 +110,45 @@ export function IncomeExpenseTable() {
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-1">
-                    <DateText value={row.date} className="text-sm text-muted-foreground" />
-                    <p className="font-medium leading-snug">{row.description}</p>
+                    <DateText
+                      value={row.date}
+                      className="text-sm text-muted-foreground"
+                    />
+                    <p className="font-medium leading-snug">
+                      {row.description}
+                    </p>
                   </div>
                   <Numeric
                     value={row.amount}
                     className={cn(
                       "shrink-0 text-lg font-semibold",
-                      row.financeType === "Income" ? "text-income" : "text-expense",
+                      row.financeType === "Income"
+                        ? "text-income"
+                        : "text-expense",
                     )}
                   />
                 </div>
                 <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                   <p>
-                    <span className="font-medium text-foreground/80">Category:</span>{" "}
+                    <span className="font-medium text-foreground/80">
+                      Category:
+                    </span>{" "}
                     {formatTransactionCategory(row.category, row.ledgerContext)}
                   </p>
                   {row.loanPaymentId != null ? (
                     <p>
-                      <span className="font-medium text-foreground/80">Loan:</span>{" "}
+                      <span className="font-medium text-foreground/80">
+                        Loan:
+                      </span>{" "}
                       {formatLoanPaymentLabel(loans, row.loanPaymentId)}
                     </p>
                   ) : null}
                 </div>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                   <Badge
-                    variant={row.financeType === "Income" ? "income" : "expense"}
+                    variant={
+                      row.financeType === "Income" ? "income" : "expense"
+                    }
                     className="px-2 py-0 text-[10px]"
                   >
                     {row.financeType}
@@ -176,7 +195,10 @@ export function IncomeExpenseTable() {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={7}
+                  className="py-8 text-center text-muted-foreground"
+                >
                   No transactions match your filters.
                 </TableCell>
               </TableRow>
@@ -190,14 +212,18 @@ export function IncomeExpenseTable() {
                     <Numeric
                       value={row.amount}
                       className={cn(
-                        row.financeType === "Income" ? "text-income" : "text-expense",
+                        row.financeType === "Income"
+                          ? "text-income"
+                          : "text-expense",
                       )}
                     />
                   </TableCell>
                   <TableCell>{row.description}</TableCell>
                   <TableCell>
                     <Badge
-                      variant={row.financeType === "Income" ? "income" : "expense"}
+                      variant={
+                        row.financeType === "Income" ? "income" : "expense"
+                      }
                       className="px-2 py-0 text-[10px]"
                     >
                       {row.financeType}
@@ -249,7 +275,7 @@ export function IncomeExpenseTable() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete transaction?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove the row from your Google Sheet.
+              This will remove the row from your income/expense history.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -269,4 +295,3 @@ export function IncomeExpenseTable() {
     </>
   );
 }
-

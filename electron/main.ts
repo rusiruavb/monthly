@@ -1,9 +1,12 @@
 import path from "node:path";
 // Built as CJS for Electron compatibility.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { app, BrowserWindow, session } = require("electron") as typeof import("electron");
+const { app, BrowserWindow, session } =
+  require("electron") as typeof import("electron");
 
 type StartedServer = { port: number; close: () => Promise<void> };
+
+let embeddedServer: StartedServer | null = null;
 
 function isLocalUrl(url: string): boolean {
   try {
@@ -30,7 +33,10 @@ function setupOfflineHardening() {
 
   session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
     const url = details.url ?? "";
-    if (!isLocalUrl(url) && (url.startsWith("http://") || url.startsWith("https://"))) {
+    if (
+      !isLocalUrl(url) &&
+      (url.startsWith("http://") || url.startsWith("https://"))
+    ) {
       callback({ cancel: true });
       return;
     }
@@ -40,8 +46,10 @@ function setupOfflineHardening() {
 
 async function createWindow(url: string) {
   const win = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width: 1440,
+    height: 900,
+    minWidth: 1440,
+    minHeight: 800,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -79,25 +87,48 @@ async function startEmbeddedServer(): Promise<StartedServer> {
   };
 }
 
-app.whenReady().then(async () => {
-  setupOfflineHardening();
-
+async function openMainWindow() {
   const devUrl = process.env.ELECTRON_RENDERER_URL;
-  let server: StartedServer | null = null;
-
   if (devUrl) {
     await createWindow(devUrl);
     return;
   }
 
-  server = await startEmbeddedServer();
-  await createWindow(`http://127.0.0.1:${server.port}`);
-}).catch((err) => {
-  console.error("CFIMA failed to start:", err);
-  app.quit();
+  if (!embeddedServer) {
+    embeddedServer = await startEmbeddedServer();
+  }
+
+  await createWindow(`http://127.0.0.1:${embeddedServer.port}`);
+}
+
+app
+  .whenReady()
+  .then(async () => {
+    setupOfflineHardening();
+    await openMainWindow();
+  })
+  .catch((err) => {
+    console.error("Monthly failed to start:", err);
+    app.quit();
+  });
+
+// macOS: closing the window does not quit the app; reopen from Dock via activate.
+app.on("activate", async () => {
+  if (BrowserWindow.getAllWindows().length > 0) return;
+
+  try {
+    await openMainWindow();
+  } catch (err) {
+    console.error("Monthly failed to reopen:", err);
+  }
 });
 
-app.on("window-all-closed", async () => {
+app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
+app.on("before-quit", async () => {
+  if (!embeddedServer) return;
+  await embeddedServer.close();
+  embeddedServer = null;
+});

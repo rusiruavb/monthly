@@ -4,6 +4,9 @@ import {
   togglePaymentStatusForLoan,
   uploadPaymentFileForLoan,
 } from "@/features/loans/services/update-payment-status";
+import { invalidateLoanQueries } from "@/features/loans/hooks/use-loans";
+import { loanQueryKey } from "@/features/loans/hooks/use-loan";
+
 export function useUpdateLoanPayment(loanId: string) {
   const queryClient = useQueryClient();
 
@@ -11,8 +14,7 @@ export function useUpdateLoanPayment(loanId: string) {
     mutationFn: ({ rowIndex }: { rowIndex: number }) =>
       togglePaymentStatusForLoan(loanId, rowIndex),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["loan", loanId] });
-      void queryClient.invalidateQueries({ queryKey: ["loans"] });
+      invalidateLoanQueries(queryClient);
     },
     onError: (err) => toast.error(String(err)),
   });
@@ -21,7 +23,7 @@ export function useUpdateLoanPayment(loanId: string) {
     mutationFn: ({ rowIndex, file }: { rowIndex: number; file: File }) =>
       uploadPaymentFileForLoan(loanId, rowIndex, file),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["loan", loanId] });
+      void queryClient.invalidateQueries({ queryKey: loanQueryKey(loanId) });
       toast.success("File uploaded");
     },
     onError: (err) => toast.error(String(err)),

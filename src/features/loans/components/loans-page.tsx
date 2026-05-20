@@ -14,12 +14,17 @@ export function LoansPage() {
     <div className="space-y-6 sm:space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-primary sm:text-2xl">Loans</h1>
+          <h1 className="text-xl font-semibold text-primary sm:text-2xl">
+            Loans
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Manage loans synced as Google Sheet tabs
+            Manage loans synced from database
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)} className="no-print w-full sm:w-auto">
+        <Button
+          onClick={() => setCreateOpen(true)}
+          className="no-print w-full sm:w-auto"
+        >
           <Plus className="mr-2 h-4 w-4" />
           Create loan
         </Button>
@@ -36,7 +41,11 @@ export function LoansPage() {
       {isError && (
         <div className="rounded-lg border border-expense/30 p-8 text-center">
           <p className="text-expense">Failed to load loans.</p>
-          <Button variant="outline" className="mt-4" onClick={() => void refetch()}>
+          <Button
+            variant="outline"
+            className="mt-4"
+            onClick={() => void refetch()}
+          >
             Retry
           </Button>
         </div>

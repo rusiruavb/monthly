@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { LOANS_QUERY_KEY } from "@/features/loans/hooks/use-loans";
+import { invalidateLoanQueries } from "@/features/loans/hooks/use-loans";
 import { deleteLoan } from "@/shared/lib/api";
 
 export function useDeleteLoan() {
@@ -10,7 +10,7 @@ export function useDeleteLoan() {
   return useMutation({
     mutationFn: (loanId: string) => deleteLoan(loanId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: LOANS_QUERY_KEY });
+      invalidateLoanQueries(queryClient);
       toast.success("Loan deleted");
       navigate("/loans");
     },

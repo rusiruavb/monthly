@@ -78,6 +78,7 @@ function mapBudgetLine(
     itemType: l.item_type,
     savingsBucket: l.savings_bucket,
     featureCategory: l.feature_category,
+    loanPaymentId: l.loan_payment_id ?? null,
     plannedDate: l.planned_date,
     fixedDepositDate: l.fixed_deposit_date,
     fixedDepositMaturityMonths: l.fixed_deposit_maturity_months,
@@ -581,6 +582,7 @@ export function createApp() {
         itemType,
         savingsBucket,
         featureCategory,
+        loanPaymentId,
         plannedDate,
         fixedDepositDate,
         fixedDepositMaturityMonths,
@@ -594,11 +596,16 @@ export function createApp() {
         itemType?: string;
         savingsBucket?: string;
         featureCategory?: string | null;
+        loanPaymentId?: number | null;
         plannedDate?: string | null;
         fixedDepositDate?: string;
         fixedDepositMaturityMonths?: number;
         fixedDepositInterestRate?: number;
       };
+      const parsedLoanPaymentId =
+        loanPaymentId != null && Number.isFinite(Number(loanPaymentId))
+          ? Number(loanPaymentId)
+          : null;
       const id = createBudgetLine(req.params.yearMonth, {
         description,
         amount: Number(amount),
@@ -607,6 +614,7 @@ export function createApp() {
         itemType: itemType === "fixed_deposit" ? "fixed_deposit" : "regular",
         savingsBucket: savingsBucket === "one_off" ? "one_off" : "savings",
         featureCategory: featureCategory ?? null,
+        loanPaymentId: parsedLoanPaymentId,
         plannedDate: plannedDate ?? null,
         fixedDepositDate,
         fixedDepositMaturityMonths:
